@@ -1,12 +1,19 @@
 import {
   IoTClient,
+  DescribeEndpointCommand,
   CreateKeysAndCertificateCommand,
   CreatePolicyCommand,
   AttachPolicyCommand,
   UpdateCertificateCommand,
 } from "@aws-sdk/client-iot";
+import {
+  IoTDataPlaneClient,
+  PublishCommand,
+} from "@aws-sdk/client-iot-data-plane";
 
-const iotClient = new IoTClient({ region: process.env.REGION || "us-east-2" });
+const region = process.env.REGION || "us-east-2";
+
+const iotClient = new IoTClient({ region });
 
 /**
  * AWS IoT Certificate Handler Lambda Function
@@ -32,6 +39,7 @@ export const handler = async (event) => {
             "iot:Publish",
             "iot:Subscribe",
             "iot:Receive",
+            "iot:DescribeEndpoint",
           ],
           Resource: "*",
         },
@@ -56,10 +64,43 @@ export const handler = async (event) => {
     });
     await iotClient.send(updateCertCmd);
 
+    const describeEndpointCmd = new DescribeEndpointCommand({
+      endpointType: "iot:Data-ATS",
+    });
+    const { endpointAddress } = await iotClient.send(describeEndpointCmd);
+
+    console.log("IoT Endpoint retrieved:", endpointAddress);
+
+    const iotDataClient = new IoTDataPlaneClient({
+      region,
+      endpoint: `https://${endpointAddress}`,
+    });
+
+    const publishCmd = new PublishCommand({
+      topic: "publishing/lambda",
+      qos: 1,
+      retain: false,
+      payload: new TextEncoder().encode(
+        JSON.stringify({
+          message: "Hello from IoTDataPlaneClient",
+          timestamp: new Date().toISOString(),
+        })
+      ),
+    });
+
+    let publishSuccess = false;
+    try {
+      await iotDataClient.send(publishCmd);
+      publishSuccess = true;
+    } catch (error) {
+      console.error("Error publishing message:", error);
+    }
+
     return {
       statusCode: 200,
       body: JSON.stringify({
-        message: "Certificate created and activated successfully",
+        message:
+          "Certificate created, activated, and message publish attempt complete",
         certificateId: certResult.certificateId,
         certificateArn: certResult.certificateArn,
         certificatePem: certResult.certificatePem,
@@ -67,6 +108,9 @@ export const handler = async (event) => {
           privateKey: certResult.keyPair.PrivateKey,
           publicKey: certResult.keyPair.PublicKey,
         },
+        publishStatus: publishSuccess
+          ? "Message published successfully"
+          : "Failed to publish message",
       }),
     };
   } catch (error) {
@@ -75,7 +119,7 @@ export const handler = async (event) => {
     return {
       statusCode: 500,
       body: JSON.stringify({
-        error: "Failed to create and activate certificate",
+        error: "Failed to create, activate certificate, or publish message",
         details: error.message,
       }),
     };
