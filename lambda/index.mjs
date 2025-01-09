@@ -77,7 +77,7 @@ export const handler = async (event) => {
     });
 
     const publishCmd = new PublishCommand({
-      topic: "publishing/lambda",
+      topic: "kinesis/test",
       qos: 1,
       retain: false,
       payload: new TextEncoder().encode(
