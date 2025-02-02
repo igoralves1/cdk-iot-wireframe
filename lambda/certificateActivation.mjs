@@ -6,6 +6,9 @@ const {
   UpdateCertificateCommand,
   AttachPolicyCommand,
   CreatePolicyCommand,
+  DeletePolicyCommand,
+  DetachPolicyCommand,
+  ListTargetsForPolicyCommand,
 } = iotPkg;
 
 const s3Client = new S3Client({ region: process.env.REGION });
@@ -38,6 +41,40 @@ export async function handler(event) {
       console.log(`Certificate ${certificateId} status updated to ACTIVE.`);
 
       const certificateArn = `arn:aws:iot:${region}:${awsAccountId}:cert/${certificateId}`;
+      const policyName = `Policy__${certificateId}`;
+
+      try {
+        const targetsResponse = await iotClient.send(
+          new ListTargetsForPolicyCommand({
+            policyName: policyName,
+          })
+        );
+
+        for (const target of targetsResponse.targets || []) {
+          await iotClient.send(
+            new DetachPolicyCommand({
+              policyName: policyName,
+              target: target,
+            })
+          );
+          console.log(`Detached policy ${policyName} from target ${target}`);
+        }
+
+        await iotClient.send(
+          new DeletePolicyCommand({
+            policyName: policyName,
+          })
+        );
+        console.log(`Deleted existing policy ${policyName}.`);
+      } catch (error) {
+        if (error.name === "ResourceNotFoundException") {
+          console.log(
+            `Policy ${policyName} does not exist. Proceeding to create.`
+          );
+        } else {
+          throw error;
+        }
+      }
 
       const policyDocument = {
         Version: "2012-10-17",
@@ -55,19 +92,21 @@ export async function handler(event) {
           },
         ],
       };
-      const createPolicyCmd = new CreatePolicyCommand({
-        policyName: `Policy_${certificateId}`,
-        policyDocument: JSON.stringify(policyDocument),
-      });
 
-      const policyResult = await iotClient.send(createPolicyCmd);
+      await iotClient.send(
+        new CreatePolicyCommand({
+          policyName: policyName,
+          policyDocument: JSON.stringify(policyDocument),
+        })
+      );
+      console.log(`Created policy ${policyName}.`);
 
-      const attachPolicyCmd = new AttachPolicyCommand({
-        policyName: policyResult.policyName,
-        target: certificateArn,
-      });
-      await iotClient.send(attachPolicyCmd);
-
+      await iotClient.send(
+        new AttachPolicyCommand({
+          policyName: policyName,
+          target: certificateArn,
+        })
+      );
       console.log(
         `Policy ${policyName} attached to certificate ${certificateId}.`
       );

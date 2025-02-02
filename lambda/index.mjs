@@ -47,7 +47,7 @@ export const handler = async (event) => {
     };
 
     const createPolicyCmd = new CreatePolicyCommand({
-      policyName: `Policy_${certResult.certificateId}`,
+      policyName: `Policyy_${certResult.certificateId}`,
       policyDocument: JSON.stringify(policyDocument),
     });
     const policyResult = await iotClient.send(createPolicyCmd);
