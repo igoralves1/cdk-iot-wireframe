@@ -14,7 +14,7 @@ const {
 const s3Client = new S3Client({ region: process.env.REGION });
 const iotClient = new IoTClient({ region: process.env.REGION });
 
-export async function handler(event) {
+export const handler = async (event) => {
   console.log(
     "Received certificate registration event:",
     JSON.stringify(event, null, 2)
@@ -81,21 +81,25 @@ export async function handler(event) {
         Statement: [
           {
             Effect: "Allow",
-            Action: [
-              "iot:Connect",
-              "iot:Publish",
-              "iot:Subscribe",
-              "iot:Receive",
-              "iot:DescribeEndpoint",
-            ],
+            Action: ["iot:Connect", "iot:DescribeEndpoint"],
             Resource: "*",
+          },
+          {
+            Effect: "Allow",
+            Action: ["iot:Publish", "iot:Receive"],
+            Resource: `arn:aws:iot:${region}:${awsAccountId}:topic/activate-device/${certificateId}/*`,
+          },
+          {
+            Effect: "Allow",
+            Action: "iot:Subscribe",
+            Resource: `arn:aws:iot:${region}:${awsAccountId}:topicfilter/activate-device/${certificateId}/*`,
           },
         ],
       };
 
       await iotClient.send(
         new CreatePolicyCommand({
-          policyName: policyName,
+          policyName,
           policyDocument: JSON.stringify(policyDocument),
         })
       );
@@ -103,7 +107,7 @@ export async function handler(event) {
 
       await iotClient.send(
         new AttachPolicyCommand({
-          policyName: policyName,
+          policyName,
           target: certificateArn,
         })
       );
@@ -128,9 +132,12 @@ export async function handler(event) {
     );
     console.log(`Event payload stored in S3 at s3://${bucketName}/${s3Key}.`);
 
-    return { status: "success" };
+    return {
+      status: "success",
+      certificateId: certificateId,
+    };
   } catch (error) {
     console.error("Error processing certificate activation event:", error);
     throw error;
   }
-}
+};

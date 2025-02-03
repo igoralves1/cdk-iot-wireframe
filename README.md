@@ -13,6 +13,11 @@ The `cdk.json` file tells the CDK Toolkit how to execute your app. The build ste
 - `cdk diff` compare deployed stack with current state
 - `cdk synth` emits the synthesized CloudFormation template
 
+- `npm install`
+- `cdk bootstrap --profile <your profile>`
+- `cdk synth`
+- `cdk deploy --profile <your profile>`
+
 ---
 
 # Registering Your CA Certificate
@@ -110,18 +115,19 @@ $ openssl x509 -req -in deviceCert.csr -CA sampleCACertificate.pem -CAkey sample
 $ cat deviceCert.crt sampleCACertificate.pem > deviceCertAndCACert.crt
 ```
 
-> Download & save the root.cert from this link : [Download AmazonRootCA](https://www.amazontrust.com/repository/AmazonRootCA1.pem)
+> Download & save the `root.cert` from this link : [Download AmazonRootCA](https://www.amazontrust.com/repository/AmazonRootCA1.pem)
 
 > Now use the following command to simulate the device connecting to IOT for first time
 
-```bash
-for i in {1..50}
-do
-   curl --tlsv1.2 --cacert root.cert --cert ./deviceCertAndCACert.crt --key ./deviceCert.key -X POST -d "{ \"message\": \"Hello, bash\" }" "https://alciucqxncdzf-ats.iot.us-east-2.amazonaws.com:8443/topics/devices/12368123";
-   echo "";
-   sleep 10
-done
 ```
+   curl --tlsv1.2 --cacert root.cert --cert ./deviceCertAndCACert.crt --key ./deviceCert.key -X POST -d "{ \"message\": \"Hello, bash\" }" "https://alciucqxncdzf-ats.iot.us-east-2.amazonaws.com:8443/topics/devices/12368123";
+```
+> Once the above command is run the certificate will be activated & a policy will be attached to it that will allow the device to push a message on `activate-device/<certificateId>/<deviceId>`. 
+You can get the `certificateId` from aws. Now run the following command to activate the device
+```
+curl --tlsv1.2 --cacert root.cert --cert ./deviceCertAndCACert.crt --key ./deviceCert.key -X POST -d "{ \"message\": \"Hello, bash\" }" "https://alciucqxncdzf-ats.iot.us-east-2.amazonaws.com:8443/topics/activate-device/6e37110667e4fdc91a3afa8ea642278c844b9b5e624dbea3f80cb24426dc579d/12368123";
+```
+> The above command will updated the policy to allow the device to only publish messages on `devices/<deviceId>`
 
 ---
 
@@ -146,3 +152,14 @@ As soon as the device is connected for the first time following things will happ
 - The `certificateActivation` lambda will also attach a policy to the above certificate.
 - The above payload will be saved in a S3 bucket.
 - Now the events from the device will be received in the IOT core.
+----------------------------
+
+- Extra commands
+```bash
+for i in {1..50}
+do
+   curl --tlsv1.2 --cacert root.cert --cert ./deviceCertAndCACert.crt --key ./deviceCert.key -X POST -d "{ \"message\": \"Hello, bash\" }" "https://alciucqxncdzf-ats.iot.us-east-2.amazonaws.com:8443/topics/devices/12368123";
+   echo "";
+   sleep 10
+done
+```
