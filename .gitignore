@@ -5,3 +5,10 @@ node_modules
 cdk.out
 info.txt
 logfile.txt
+*.cert
+*.crt
+*.key
+*.pem
+*.csr
+*.srl
+*.bash
