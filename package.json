@@ -19,6 +19,7 @@
     "@aws-sdk/client-iot": "^3.716.0",
     "@aws-sdk/client-iot-data-plane": "^3.716.0",
     "aws-cdk-lib": "2.165.0",
-    "constructs": "^10.0.0"
+    "constructs": "^10.0.0",
+    "node-forge": "^1.3.1"
   }
 }
