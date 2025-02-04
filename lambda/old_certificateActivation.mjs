@@ -1,11 +1,9 @@
 import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import iotPkg from "@aws-sdk/client-iot";
-import forge from "node-forge";
 
 const {
   IoTClient,
   UpdateCertificateCommand,
-  DescribeCertificateCommand,
   AttachPolicyCommand,
   CreatePolicyCommand,
   DeletePolicyCommand,
@@ -36,67 +34,49 @@ export const handler = async (event) => {
 
       await iotClient.send(
         new UpdateCertificateCommand({
-          certificateId,
+          certificateId: certificateId,
           newStatus: "ACTIVE",
         })
       );
       console.log(`Certificate ${certificateId} status updated to ACTIVE.`);
-
-      const describeResp = await iotClient.send(
-        new DescribeCertificateCommand({ certificateId })
-      );
-      const certDescription = describeResp.certificateDescription || {};
-      const { certificatePem } = certDescription;
-
-      if (!certificatePem) {
-        throw new Error(
-          `Could not retrieve certificate PEM for certificateId ${certificateId}`
-        );
-      }
-      const forgeCert = forge.pki.certificateFromPem(certificatePem);
-      const subjectCN = forgeCert.subject.getField("CN")
-        ? forgeCert.subject.getField("CN").value
-        : null;
-
-      if (!subjectCN) {
-        throw new Error(
-          `No CN (Common Name) found in certificate subject. Cannot extract deviceId.`
-        );
-      }
-      const deviceId = subjectCN;
-      console.log(`Extracted deviceId (CN) from cert: ${deviceId}`);
 
       const certificateArn = `arn:aws:iot:${region}:${awsAccountId}:cert/${certificateId}`;
       const policyName = `Policy__${certificateId}`;
 
       try {
         const targetsResponse = await iotClient.send(
-          new ListTargetsForPolicyCommand({ policyName })
+          new ListTargetsForPolicyCommand({
+            policyName: policyName,
+          })
         );
+
         for (const target of targetsResponse.targets || []) {
           await iotClient.send(
             new DetachPolicyCommand({
-              policyName,
-              target,
+              policyName: policyName,
+              target: target,
             })
           );
           console.log(`Detached policy ${policyName} from target ${target}`);
         }
 
         await iotClient.send(
-          new DeletePolicyCommand({ policyName })
+          new DeletePolicyCommand({
+            policyName: policyName,
+          })
         );
         console.log(`Deleted existing policy ${policyName}.`);
       } catch (error) {
         if (error.name === "ResourceNotFoundException") {
           console.log(
-            `Policy ${policyName} does not exist yet; proceeding to create.`
+            `Policy ${policyName} does not exist. Proceeding to create.`
           );
         } else {
           throw error;
         }
       }
-      const restrictedPolicy = {
+
+      const policyDocument = {
         Version: "2012-10-17",
         Statement: [
           {
@@ -107,12 +87,12 @@ export const handler = async (event) => {
           {
             Effect: "Allow",
             Action: ["iot:Publish", "iot:Receive"],
-            Resource: `arn:aws:iot:${region}:${awsAccountId}:topic/devices/${deviceId}`,
+            Resource: `arn:aws:iot:${region}:${awsAccountId}:topic/activate-device/${certificateId}/*`,
           },
           {
             Effect: "Allow",
-            Action: ["iot:Subscribe"],
-            Resource: `arn:aws:iot:${region}:${awsAccountId}:topicfilter/devices/${deviceId}`,
+            Action: "iot:Subscribe",
+            Resource: `arn:aws:iot:${region}:${awsAccountId}:topicfilter/activate-device/${certificateId}/*`,
           },
         ],
       };
@@ -120,10 +100,10 @@ export const handler = async (event) => {
       await iotClient.send(
         new CreatePolicyCommand({
           policyName,
-          policyDocument: JSON.stringify(restrictedPolicy),
+          policyDocument: JSON.stringify(policyDocument),
         })
       );
-      console.log(`Created restricted policy ${policyName} for device ${deviceId}.`);
+      console.log(`Created policy ${policyName}.`);
 
       await iotClient.send(
         new AttachPolicyCommand({
@@ -154,7 +134,7 @@ export const handler = async (event) => {
 
     return {
       status: "success",
-      certificateId,
+      certificateId: certificateId,
     };
   } catch (error) {
     console.error("Error processing certificate activation event:", error);

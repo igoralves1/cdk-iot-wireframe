@@ -41,20 +41,15 @@ $ openssl req -x509 -new -nodes -key sampleCACertificate.key -sha256 -days 365 -
 ```
 
 ```
+$ openssl genrsa -out privateKeyVerification.key 2048
+```
+```
 $ aws iot get-registration-code
 ```
 
-> Save the Registration code it will be used in next steps
+> <b>NOTE: Save the Registration code received in above step it will be used in next steps</b>
 
-```
-$ openssl genrsa -out privateKeyVerification.key 2048
-```
-
-```
-$ openssl req -new -key privateKeyVerification.key -out privateKeyVerification.csr
-```
-
-> During the CSR creation process, you will be prompted for information.
+> In the next step, you will be prompted to enter information. When asked to Enter the `Common Name` Enter the Registration Code
 
 ```
 ...
@@ -63,33 +58,28 @@ Organizational Unit Name (eg, section)
 Common Name (e.g. server FQDN or YOUR name) []: XXXXXSAMPLEREGISTRATIONCODEXXXXX
 EMAIL ADDRESS []:
 ```
+```
+$ openssl req -new -key privateKeyVerification.key -out privateKeyVerification.csr
+```
 
-> Enter the registration code into the Common Name field of the verification certificate:
+
 
 ```
 $ openssl x509 -req -in privateKeyVerification.csr -CA sampleCACertificate.pem -CAkey sampleCACertificate.key -CAcreateserial -out privateKeyVerification.crt -days 365 -sha256
 ```
 
 ```
-$ aws iot register-ca-certificate --ca-certificate file://sampleCACertificate.pem --verification-certificate file://privateKeyVerification.crt
+$ aws iot register-ca-certificate --ca-certificate file://sampleCACertificate.pem --verification-certificate file://privateKeyVerification.crt  --set-as-active --allow-auto-registration
 ```
 
-> In response you will get the `certificateId` save that it will be used in next steps
+<!-- > In response you will get the `certificateId` save that it will be used in next steps
 
 ```
 {
     "certificateArn": "arn:aws:iot:us-east-2:996242555412:cacert/YYYYYYYYYYYYYY",
     "certificateId": "XXXXXXXXXXXXXXXXXXXXXXXXX"
 }
-```
-
-```
-$ aws iot update-ca-certificate --certificate-id <certificateId> --new-status ACTIVE
-```
-
-```
-$ aws iot update-ca-certificate --certificate-id <caCertificateId> --new-auto-registration-status ENABLE
-```
+``` -->
 
 > Now follow the B. Steps to create a device certificate and connect to the IOT
 
@@ -100,7 +90,7 @@ Enter the following commands in your terminal to create a device certificate:
 ```bash
 $ openssl genrsa -out deviceCert.key 2048
 ```
-
+> <b>NOTE : In the next step when asked to enter the `Common Name` Enter the `<deviceId>` that you want to use to publish message on topic `devices/<deviceId>`</b>
 ```bash
 $ openssl req -new -key deviceCert.key -out deviceCert.csr
 ```
@@ -119,15 +109,14 @@ $ cat deviceCert.crt sampleCACertificate.pem > deviceCertAndCACert.crt
 
 > Now use the following command to simulate the device connecting to IOT for first time
 
+```bash
+curl --tlsv1.2 --cacert root.cert --cert ./deviceCertAndCACert.crt --key ./deviceCert.key -X POST -d "{ \"message\": \"Hello, bash\" }" "https://alciucqxncdzf-ats.iot.us-east-2.amazonaws.com:8443/topics/devices/<deviceId>";
 ```
-   curl --tlsv1.2 --cacert root.cert --cert ./deviceCertAndCACert.crt --key ./deviceCert.key -X POST -d "{ \"message\": \"Hello, bash\" }" "https://alciucqxncdzf-ats.iot.us-east-2.amazonaws.com:8443/topics/devices/12368123";
+> Once the above command is run the certificate will be activated & a policy will be attached to it that will allow the device to publish a message on `devices/<deviceId>`. The `<deviceId>` will be taken from the certificate itself ( we added the deviceId in `Common Name` before ).
+```bash
+curl --tlsv1.2 --cacert root.cert --cert ./deviceCertAndCACert.crt --key ./deviceCert.key -X POST -d "{ \"message\": \"Hello, from devie\" }" "https://alciucqxncdzf-ats.iot.us-east-2.amazonaws.com:8443/topics/devices/<deviceId>";
 ```
-> Once the above command is run the certificate will be activated & a policy will be attached to it that will allow the device to push a message on `activate-device/<certificateId>/<deviceId>`. 
-You can get the `certificateId` from aws. Now run the following command to activate the device
-```
-curl --tlsv1.2 --cacert root.cert --cert ./deviceCertAndCACert.crt --key ./deviceCert.key -X POST -d "{ \"message\": \"Hello, bash\" }" "https://alciucqxncdzf-ats.iot.us-east-2.amazonaws.com:8443/topics/activate-device/6e37110667e4fdc91a3afa8ea642278c844b9b5e624dbea3f80cb24426dc579d/12368123";
-```
-> The above command will updated the policy to allow the device to only publish messages on `devices/<deviceId>`
+> The above command will publish messages on `devices/<deviceId>`
 
 ---
 
