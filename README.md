@@ -40,6 +40,9 @@ $ openssl genrsa -out sampleCACertificate.key 2048
 $ openssl req -x509 -new -nodes -key sampleCACertificate.key -sha256 -days 365 -out sampleCACertificate.pem -addext "basicConstraints=critical,CA:true" 
 ```
 
+> <i> NOTE : You can use this command to output the .pem file `openssl x509 -in sampleCACertificate.pem -text -noout`</i>
+
+
 ```
 $ openssl genrsa -out privateKeyVerification.key 2048
 ```
