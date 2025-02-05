@@ -1,3 +1,4 @@
+import { LambdaClient, InvokeCommand } from "@aws-sdk/client-lambda";
 import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import iotPkg from "@aws-sdk/client-iot";
 import forge from "node-forge";
@@ -15,6 +16,7 @@ const {
 
 const s3Client = new S3Client({ region: process.env.REGION });
 const iotClient = new IoTClient({ region: process.env.REGION });
+const lambdaClient = new LambdaClient({ region: process.env.REGION });
 
 export const handler = async (event) => {
   console.log(
@@ -83,9 +85,7 @@ export const handler = async (event) => {
           console.log(`Detached policy ${policyName} from target ${target}`);
         }
 
-        await iotClient.send(
-          new DeletePolicyCommand({ policyName })
-        );
+        await iotClient.send(new DeletePolicyCommand({ policyName }));
         console.log(`Deleted existing policy ${policyName}.`);
       } catch (error) {
         if (error.name === "ResourceNotFoundException") {
@@ -123,7 +123,9 @@ export const handler = async (event) => {
           policyDocument: JSON.stringify(restrictedPolicy),
         })
       );
-      console.log(`Created restricted policy ${policyName} for device ${deviceId}.`);
+      console.log(
+        `Created restricted policy ${policyName} for device ${deviceId}.`
+      );
 
       await iotClient.send(
         new AttachPolicyCommand({
@@ -134,6 +136,24 @@ export const handler = async (event) => {
       console.log(
         `Policy ${policyName} attached to certificate ${certificateId}.`
       );
+
+      const thingCreationPayload = {
+        deviceId,
+        certificateArn,
+      };
+      console.log(
+        "Invoking ThingCreationLambda with payload:",
+        thingCreationPayload
+      );
+
+      const res = await lambdaClient.send(
+        new InvokeCommand({
+          FunctionName: process.env.THING_CREATION_LAMBDA_NAME,
+          InvocationType: "RequestResponse",
+          Payload: Buffer.from(JSON.stringify(thingCreationPayload)),
+        })
+      );
+      console.log("Successfully invoked ThingCreationLambda : ", res);
     } else {
       console.log(
         `Certificate ${certificateId} is in state "${certificateStatus}". No action taken.`
