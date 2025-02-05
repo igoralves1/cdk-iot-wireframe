@@ -20,13 +20,42 @@ The `cdk.json` file tells the CDK Toolkit how to execute your app. The build ste
 
 ---
 
-# Registering Your CA Certificate
-
 ### Resources
 
 1. [Just-in-Time Registration of Device Certificates on AWS IoT](https://aws.amazon.com/blogs/iot/just-in-time-registration-of-device-certificates-on-aws-iot/)
 2. [Create a client certificate using your CA certificate](https://docs.aws.amazon.com/iot/latest/developerguide/create-device-cert.html)
 3. [Register a client certificate when the client connects to AWS IoT just-in-time registration (JITR)](https://docs.aws.amazon.com/iot/latest/developerguide/auto-register-device-cert.html)
+
+---
+
+### <b>0. Automated Script Usage</b>
+
+> Note: You will be prompted to enter the `deviceId`. This `deviceId` will be inserted into the `Common Name` of the certificate.
+
+
+1. To create both CA & Device Certificate
+
+```py
+ python3 create_iot_certs.py --createCA --createDevice
+```
+
+2. To Only create, register & activate the CA
+```py
+ python3 create_iot_certs.py --createCA 
+```
+
+3. To Only create the Device Certificates 
+```py
+ python3 create_iot_certs.py --createDevice
+```
+
+> INFO : Once the command ran successfully it will return the test connection command that can be used to test the connection to the device. It will be in the following format
+
+```bash
+curl --tlsv1.2 --cacert root.cert --cert ./345_deviceCert.crt --key ./345_deviceCert.key -X POST -d '{ "message": "Hello, from test device : 345" }' "https://<IotEndpoint>.amazonaws.com:8443/topics/devices/<deviceId>"
+```
+
+---
 
 ### A. Commands to Create & Register Your CA Certificate
 
