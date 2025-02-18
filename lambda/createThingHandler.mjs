@@ -6,6 +6,10 @@ import {
 
 const iotClient = new IoTClient({ region: process.env.REGION });
 
+const generateUID = () => {
+  return Date.now().toString(36) + Math.random().toString(36).substring(2, 8);
+};
+
 export const handler = async (event) => {
   console.log(
     "createThingHandler received event:",
@@ -19,13 +23,25 @@ export const handler = async (event) => {
     throw new Error("Missing deviceId or certId from IoT event payload.");
   }
 
+  const uid = generateUID();
+
   const accountId = process.env.ACCOUNT_ID;
   const region = process.env.REGION;
   const certificateArn = `arn:aws:iot:${region}:${accountId}:cert/${certId}`;
 
   try {
-    console.log(`Creating Thing with name: ${deviceId}`);
-    await iotClient.send(new CreateThingCommand({ thingName: deviceId }));
+    console.log(`Creating Thing with name: ${deviceId} and uid: ${uid}`);
+    await iotClient.send(
+      new CreateThingCommand({
+        thingName: deviceId,
+        attributePayload: {
+          attributes: {
+            uid: uid,
+          },
+          merge: true,
+        },
+      })
+    );
     console.log("Thing created successfully.");
 
     console.log(
@@ -42,6 +58,7 @@ export const handler = async (event) => {
     return {
       status: "success",
       thingName: deviceId,
+      uid: uid,
     };
   } catch (error) {
     console.error("Error in createThingHandler:", error);
