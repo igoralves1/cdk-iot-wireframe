@@ -1,7 +1,9 @@
 import { LambdaClient, InvokeCommand } from "@aws-sdk/client-lambda";
 import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { DynamoDBClient, PutItemCommand } from "@aws-sdk/client-dynamodb";
 import iotPkg from "@aws-sdk/client-iot";
 import forge from "node-forge";
+import { v4 as uuidv4 } from "uuid";
 
 const {
   IoTClient,
@@ -18,6 +20,8 @@ const s3Client = new S3Client({ region: process.env.REGION });
 const iotClient = new IoTClient({ region: process.env.REGION });
 const lambdaClient = new LambdaClient({ region: process.env.REGION });
 
+const ddbClient = new DynamoDBClient({ region: process.env.REGION });
+
 export const handler = async (event) => {
   console.log(
     "Received certificate registration event:",
@@ -28,6 +32,7 @@ export const handler = async (event) => {
     const { certificateId, certificateStatus, awsAccountId } = event;
     const region = process.env.REGION;
     const bucketName = process.env.BUCKET_NAME;
+    const tableName = process.env.DEVICE_REGISTRATION_TABLE_NAME;
 
     if (!certificateId) {
       throw new Error("Missing certificateId in event payload.");
@@ -67,6 +72,41 @@ export const handler = async (event) => {
       }
       const deviceId = subjectCN;
       console.log(`Extracted deviceId (CN) from cert: ${deviceId}`);
+
+      const uid = uuidv4();
+
+      const samplePayload = {
+        id: uid,
+        buildingId: "NA",
+        createdAt: "2019-03-15T13:39:20.20Z",
+        deviceId: uid,
+        name: "SC-1 G-1st",
+        serial: deviceId,
+        type: "SC",
+        __typename: "Device",
+      };
+
+      try {
+        await ddbClient.send(
+          new PutItemCommand({
+            TableName: tableName,
+            Item: {
+              id: { S: samplePayload.id },
+              buildingId: { S: samplePayload.buildingId },
+              createdAt: { S: samplePayload.createdAt },
+              deviceId: { S: samplePayload.deviceId },
+              name: { S: samplePayload.name },
+              serial: { S: samplePayload.serial },
+              type: { S: samplePayload.type },
+              __typename: { S: samplePayload.__typename },
+            },
+          })
+        );
+        console.log(`Saved device payload to DynamoDB table "${tableName}"`);
+      } catch (dbErr) {
+        console.error("Error writing item to DynamoDB:", dbErr);
+        throw dbErr;
+      }
 
       const certificateArn = `arn:aws:iot:${region}:${awsAccountId}:cert/${certificateId}`;
       const policyName = `Policy__${certificateId}`;
