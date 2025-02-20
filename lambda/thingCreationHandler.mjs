@@ -9,14 +9,26 @@ const iotClient = new IoTClient({ region: process.env.REGION });
 export const handler = async (event) => {
   console.log("ThingCreationLambda received:", JSON.stringify(event));
 
-  const { deviceId, certificateArn } = event;
-  if (!deviceId || !certificateArn) {
-    throw new Error("Missing 'deviceId' or 'certificateArn' in event payload.");
+  const { deviceId, certificateArn, uid } = event;
+  if (!deviceId || !certificateArn || !uid) {
+    throw new Error(
+      "Missing 'deviceId', 'uid' or 'certificateArn' in event payload."
+    );
   }
 
   try {
     console.log(`Creating IoT Thing: ${deviceId}`);
-    await iotClient.send(new CreateThingCommand({ thingName: deviceId }));
+    await iotClient.send(
+      new CreateThingCommand({
+        thingName: deviceId,
+        attributePayload: {
+          attributes: {
+            uid: uid,
+          },
+          merge: true,
+        },
+      })
+    );
 
     console.log(
       `Attaching certificateArn ${certificateArn} to Thing ${deviceId}`

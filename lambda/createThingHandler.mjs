@@ -18,12 +18,13 @@ export const handler = async (event) => {
 
   const deviceId = event.deviceId;
   const certId = event.certId;
+  const uid = event.uid;
 
-  if (!deviceId || !certId) {
-    throw new Error("Missing deviceId or certId from IoT event payload.");
+  if (!deviceId || !certId || !uid) {
+    throw new Error("Missing deviceId, uid or certId from IoT event payload.");
   }
 
-  const uid = generateUID();
+  // const uid = generateUID();
 
   const accountId = process.env.ACCOUNT_ID;
   const region = process.env.REGION;
