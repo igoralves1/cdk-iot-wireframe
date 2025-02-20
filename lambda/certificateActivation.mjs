@@ -180,6 +180,7 @@ export const handler = async (event) => {
       const thingCreationPayload = {
         deviceId,
         certificateArn,
+        uid
       };
       console.log(
         "Invoking ThingCreationLambda with payload:",
